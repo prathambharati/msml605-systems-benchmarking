@@ -1,0 +1,43 @@
+{
+  "metadata": {
+    "gpu": "NVIDIA A100-SXM4-80GB",
+    "target_model": "Qwen/Qwen2.5-7B-Instruct",
+    "draft_model": "Qwen/Qwen2.5-0.5B-Instruct",
+    "max_new_tokens": 100,
+    "n_prompts": 5,
+    "note": "Aggregated summary metrics from the systems benchmarking notebook. Full per-run data is in rich_data_a100.json."
+  },
+  "fp16": {
+    "mean_throughput_tok_per_s": 26.4,
+    "peak_memory_gb": 16.96,
+    "median_latency_ms": 47.8,
+    "p50_latency_ms": 47.8,
+    "p90_latency_ms": 49.5,
+    "p99_latency_ms": 52.0,
+    "max_latency_ms": 52.8,
+    "latency_std_ms": 1.0,
+    "n_decode_steps_measured": 200
+  },
+  "speculative_k3": {
+    "mean_throughput_tok_per_s": 14.2,
+    "peak_memory_gb": 17.4,
+    "speedup_vs_fp16": 0.54,
+    "mean_acceptance_rate": 0.629,
+    "mean_accepted_per_round": 1.89,
+    "round_time_ms": 202.2,
+    "k": 3
+  },
+  "comparison": {
+    "speedup": 0.54,
+    "memory_overhead_gb": 0.44,
+    "interpretation": "Speculative decoding does not provide wall-clock speedup at batch=1 on A100. The target/draft per-token time ratio is only 1.22x (well below the 4x threshold needed for speculation to amortize), because both models are memory-bound rather than compute-bound."
+  },
+  "roofline": {
+    "a100_peak_fp16_tflops": 312.0,
+    "a100_peak_hbm_bandwidth_tb_per_s": 2.0,
+    "ridge_point_flops_per_byte": 156.0,
+    "estimated_arithmetic_intensity_flops_per_byte": 2.0,
+    "achieved_compute_utilization_percent": 0.4,
+    "regime": "deeply memory-bound"
+  }
+}

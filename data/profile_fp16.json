@@ -1,0 +1,76 @@
+{
+  "metadata": {
+    "configuration": "FP16 baseline",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "gpu": "NVIDIA A100-SXM4-80GB",
+    "n_decode_steps": 10,
+    "tool": "torch.profiler.profile with CUDA + CPU activities",
+    "note": "Top GPU kernels by total CUDA time across 10 decode steps. The decode_step_X entries are record_function wrappers, not actual kernels."
+  },
+  "summary": {
+    "total_cuda_time_ms": 1078.4,
+    "n_kernels_recorded": 11,
+    "dominant_kernel": "aten::mm",
+    "dominant_kernel_pct_of_total": 10.4
+  },
+  "top_kernels": [
+    {
+      "rank": 1,
+      "name": "aten::mm",
+      "cuda_time_ms": 111.8,
+      "description": "matrix multiplication, covers attention Q/K/V projections, MLP gate/up/down, and output projection"
+    },
+    {
+      "rank": 2,
+      "name": "decode_step_5 (record_function)",
+      "cuda_time_ms": 72.9
+    },
+    {
+      "rank": 3,
+      "name": "decode_step_2 (record_function)",
+      "cuda_time_ms": 69.9
+    },
+    {
+      "rank": 4,
+      "name": "decode_step_6 (record_function)",
+      "cuda_time_ms": 69.4
+    },
+    {
+      "rank": 5,
+      "name": "decode_step_0 (record_function)",
+      "cuda_time_ms": 69.0
+    },
+    {
+      "rank": 6,
+      "name": "decode_step_8 (record_function)",
+      "cuda_time_ms": 69.0
+    },
+    {
+      "rank": 7,
+      "name": "decode_step_4 (record_function)",
+      "cuda_time_ms": 68.8
+    },
+    {
+      "rank": 8,
+      "name": "decode_step_1 (record_function)",
+      "cuda_time_ms": 68.1
+    },
+    {
+      "rank": 9,
+      "name": "decode_step_7 (record_function)",
+      "cuda_time_ms": 67.7
+    },
+    {
+      "rank": 10,
+      "name": "decode_step_9 (record_function)",
+      "cuda_time_ms": 67.4
+    },
+    {
+      "rank": 11,
+      "name": "Other (aggregated)",
+      "cuda_time_ms": 304.4,
+      "description": "elementwise operations, softmax, layer norm, tensor reshape, copies, etc."
+    }
+  ],
+  "interpretation": "aten::mm is the single largest individual kernel at 111.8 ms, but the bulk of CUDA time (304.4 ms in 'Other') is distributed across many small kernels including elementwise ops, softmax, and layer norm. This is consistent with the workload being memory-bound: the main cost is reading parameters and KV cache from HBM rather than running large matmul operations."
+}

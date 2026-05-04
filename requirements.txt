@@ -1,0 +1,16 @@
+# Core scientific stack
+numpy>=1.24
+matplotlib>=3.7
+pandas>=2.0
+
+# LLM inference
+torch>=2.1
+transformers>=4.40
+accelerate>=0.25
+
+# GPU profiling
+pynvml>=11.5
+
+# Notebooks
+jupyter>=1.0
+notebook>=7.0
