@@ -1,77 +1,132 @@
-# Why Speculative Decoding Does Not Help
+# Systems-Level Benchmarking of LLM Inference
 
-Systems-level benchmarking and roofline analysis of LLM inference acceleration techniques on a single NVIDIA A100 80GB GPU. Final project for **MSML 605: Computing Systems for Machine Learning**, University of Maryland, College Park (Spring 2026).
+Final project for **MSML 605: Computing Systems for Machine Learning**, University of Maryland, College Park (Spring 2026).
 
-## TL;DR
+**Author:** Pratham Ramachandra Bharati  
+**Report:** [docs/final_report.pdf](docs/final_report.pdf)
 
-We benchmark autoregressive decoding for Qwen 2.5 7B Instruct against speculative decoding with a Qwen 2.5 0.5B draft, sweeping speculation length from k=1 to k=10 (400 measured runs). The headline finding: **speculative decoding does not produce a wall-clock speedup at any value of k**. The FP16 baseline reaches 26.4 tok/s; the best speculative configuration (k=3) reaches only 14.2 tok/s, a 0.54x slowdown. We diagnose this with a roofline analysis and show the textbook formula predicts the slowdown to within 1%.
+## Summary
+
+We benchmark autoregressive decoding for Qwen 2.5 7B Instruct against speculative decoding with a Qwen 2.5 0.5B draft, sweeping speculation length from k=1 to k=10 (400 measured runs). The headline finding: **speculative decoding does not produce a wall-clock speedup at any value of k** on a single A100 80GB at batch size 1. The FP16 baseline reaches 26.4 tok/s; the best speculative configuration (k=3) reaches only 14.2 tok/s, a 0.54x slowdown. We diagnose this with a roofline analysis and show the textbook formula predicts the slowdown to within 1%.
 
 ## Key results
 
 | Configuration | Throughput | Memory | Notes |
 |---|---|---|---|
-| FP16 baseline | 26.4 tok/s | 17.0 GB | Reference |
+| FP16 baseline | 26.4 tok/s | 17.0 GB | Reference point |
 | Speculative k=3 (best) | 14.2 tok/s | 17.4 GB | 0.54x of FP16 |
 | Speculative k=1 | 12.8 tok/s | 17.4 GB | Acceptance 0.767 |
 | Speculative k=10 | 10.85 tok/s | 17.4 GB | Acceptance 0.356 |
-
-## Why speculative decoding fails on this hardware
-
-The textbook speedup formula predicts speedup as a function of acceptance probability and the per-token time ratio between draft and target. With our measured alpha = 0.629 and c = 0.82 (1.22x ratio), the predicted speedup at k=3 is 0.55x. The empirical speedup is 0.54x. The formula is right; the assumption that the draft is "much faster" simply does not hold at batch=1 on memory-bound hardware.
-
-The deeper reason: A100 has a ridge point at 156 FLOPs/byte. Single-token decode operates at ~2 FLOPs/byte. Both target and draft are deeply memory-bound. Per-token weight-read time (7 ms for the target, 0.5 ms for the draft) is dwarfed by fixed per-token overheads (kernel launches, attention, KV cache). The 14x parameter gap collapses to a 1.22x time gap in practice.
 
 ## Repository layout
 
 ```
 .
-├── README.md                       This file
+├── README.md                 This file
+├── Dockerfile                Reproducible environment (CUDA 12.1 + PyTorch)
+├── docker-compose.yml        One-command launch
+├── requirements.txt          Python dependencies
 ├── docs/
-│   └── final_report.pdf            10-page IEEE-style report
+│   └── final_report.pdf      4-page IEEE-format report
 ├── notebooks/
-│   └── msml605_systems.ipynb       Full benchmarking pipeline
-├── figures/
-│   ├── fig_roofline.png            A100 roofline with operating points
-│   ├── fig_k_sweep.png             Throughput across k=1-10 (400 runs)
-│   ├── fig_acceptance.png          Per-round acceptance vs k
-│   ├── fig_latency.png             FP16 latency distribution (200 steps)
-│   └── fig_kernels.png             PyTorch profiler kernel breakdown
-└── data/
-    └── (intermediate JSON results from benchmark runs)
+│   └── msml605_systems.ipynb Full benchmarking pipeline
+├── figures/                  All plots referenced in the report
+└── data/                     Intermediate measurement results
 ```
 
-## Reproducing
+---
 
-The benchmarking notebook runs end-to-end on Google Colab Pro with an A100 instance.
+## How to run
 
-1. Open `notebooks/msml605_systems.ipynb` in Colab
-2. Set the runtime to A100 GPU
-3. Run cells sequentially; the FP16 baseline takes about 5 minutes, the speculative k-sweep takes about 90 minutes for 400 runs
+There are **three options** for running this project. Pick whichever matches your setup.
 
-**Hardware needed.** NVIDIA A100 80GB. Smaller GPUs (T4, A10) will run out of memory loading Qwen 2.5 7B in FP16 alongside the 0.5B draft.
+### Option 1: Docker (recommended, reproducible)
+
+**Prerequisites:**
+- Docker Desktop installed ([download](https://www.docker.com/products/docker-desktop/))
+- NVIDIA Container Toolkit ([install guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html))
+- An NVIDIA GPU with CUDA 12.1+ support (A100 used in this work; H100 / A6000 / RTX 4090 should also work)
+
+**To pull and run the pre-built image from Docker Hub:**
+
+```bash
+docker pull prathambharati/msml605-bharati:latest
+docker run --gpus all -p 8888:8888 prathambharati/msml605-bharati:latest
+```
+
+Then open `http://localhost:8888` in your browser. The notebook is at `notebooks/msml605_systems.ipynb`.
+
+**To build the image yourself from source:**
+
+```bash
+git clone https://github.com/prathambharati/msml605-systems-benchmarking.git
+cd msml605-systems-benchmarking
+docker build -t msml605-bharati:latest .
+docker run --gpus all -p 8888:8888 msml605-bharati:latest
+```
+
+**Or use docker-compose:**
+
+```bash
+docker-compose up
+```
+
+### Option 2: Google Colab Pro (matches our setup)
+
+The benchmarking notebook was developed and validated on Google Colab Pro with an A100 instance. To reproduce:
+
+1. Upload `notebooks/msml605_systems.ipynb` to Colab
+2. Set the runtime to A100 GPU (Runtime → Change runtime type → A100)
+3. Run all cells sequentially. The FP16 baseline takes about 5 minutes; the speculative k-sweep takes about 90 minutes for 400 runs
+
+### Option 3: Local installation
+
+**Prerequisites:**
+- Python 3.10+
+- An NVIDIA GPU with CUDA 12.1+ (A100 80GB recommended; smaller GPUs will fail to load Qwen 2.5 7B in FP16)
+- ~30 GB free disk space (for model downloads)
+
+```bash
+git clone https://github.com/prathambharati/msml605-systems-benchmarking.git
+cd msml605-systems-benchmarking
+
+# Create a virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Launch Jupyter
+jupyter notebook notebooks/msml605_systems.ipynb
+```
+
+---
+
+## Hardware caveats
+
+- **A100 80GB** is what we used. The 7B model in FP16 needs ~14 GB for weights plus ~3 GB for KV cache, so it fits comfortably with overhead for the draft model.
+- **Smaller GPUs** (T4, A10, RTX 4090 24GB) will run out of memory loading both the 7B target and 0.5B draft together. To run on a smaller GPU, you can:
+  - Run only the FP16 baseline cells
+  - Use a smaller target model (Qwen 2.5 1.5B)
+  - Apply quantization (which we attempted but were blocked on by a bitsandbytes/Triton issue, see Section VI of the report)
+
+---
 
 ## What we attempted but could not complete
 
 The original project plan included INT8 and INT4 (NF4) quantization through bitsandbytes. The implementation is in the notebook but execution was blocked by a binary incompatibility between bitsandbytes 0.43.1 and the Triton compiler version that ships with Colab's PyTorch image. The specific failure is `ModuleNotFoundError: No module named 'triton.ops'` at model-load time. Three workarounds were attempted (version pinning, manual Triton install, device_map variations); none resolved the issue cleanly within the project timeline.
 
-The final report (`docs/final_report.pdf`) presents the FP16 + speculative comparison plus the roofline analysis, and discusses what the roofline predicts INT8/INT4 should achieve based on the bytes-per-parameter reduction. Quantization measurement is left as future work, ideally on a self-hosted environment with full control over the bitsandbytes/Triton stack.
+The report (`docs/final_report.pdf`) presents the FP16 + speculative comparison plus the roofline analysis, and discusses what the roofline predicts INT8/INT4 should achieve based on the bytes-per-parameter reduction. Quantization measurement is left as future work, ideally on a self-hosted environment with full control over the bitsandbytes/Triton stack.
 
-## Hardware regime takeaway
-
-The roofline framework lets us predict where each technique helps:
-
-**Memory-bound regime (this work):** quantization is the right answer. Reducing bytes per parameter directly reduces HBM traffic, which is the actual bottleneck.
-
-**Compute-bound regime (not tested here):** speculative decoding makes sense. This is the regime of larger batch sizes, smaller draft models, or specialized speculative pipelines like Medusa and EAGLE.
-
-The practical recommendation: run a roofline analysis before committing to any acceleration technique. Match the technique to the regime, not to the popularity of the technique in the literature.
+---
 
 ## Citation
 
 ```bibtex
-@misc{bharati2026why,
+@misc{bharati2026systems,
   author       = {Pratham Ramachandra Bharati},
-  title        = {Why Speculative Decoding Does Not Help: A Systems-Level Roofline Analysis of LLM Inference on a Single A100 GPU},
+  title        = {Systems-Level Benchmarking of LLM Inference: Why Speculative Decoding Does Not Help on a Single A100 GPU},
   year         = {2026},
   howpublished = {Final project, MSML 605, University of Maryland, College Park},
   url          = {https://github.com/prathambharati/msml605-systems-benchmarking}

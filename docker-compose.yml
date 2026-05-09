@@ -1,0 +1,25 @@
+# docker-compose for MSML 605 final project
+# Run with: docker-compose up
+#
+# Requires nvidia-docker2 / nvidia-container-toolkit installed on host
+# (so the container can access the GPU)
+
+version: '3.8'
+
+services:
+  msml605:
+    build: .
+    image: prathambharati/msml605-bharati:latest
+    container_name: msml605-systems
+    ports:
+      - "8888:8888"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      # Mount notebooks for persistent edits (optional)
+      - ./notebooks:/workspace/notebooks
