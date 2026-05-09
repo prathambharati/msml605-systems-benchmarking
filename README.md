@@ -27,7 +27,7 @@ We benchmark autoregressive decoding for Qwen 2.5 7B Instruct against speculativ
 ├── docker-compose.yml        One-command launch
 ├── requirements.txt          Python dependencies
 ├── docs/
-│   └── final_report.pdf      4-page IEEE-format report
+│   └── final_report.pdf      6-page IEEE-format report
 ├── notebooks/
 │   └── msml605_systems.ipynb Full benchmarking pipeline
 ├── figures/                  All plots referenced in the report
